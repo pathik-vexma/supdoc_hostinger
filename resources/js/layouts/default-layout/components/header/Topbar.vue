@@ -60,6 +60,7 @@
       </div>
     </div>
 
+  
     <!-- Search Results Indicator -->
     <div v-if="searchActive" class="search-results-info">
       <div class="results-navigation">

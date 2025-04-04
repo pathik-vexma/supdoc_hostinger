@@ -1,4 +1,4 @@
-import { ref } from "vue";
+import { ref, watch, onMounted } from "vue";
 import { defineStore } from "pinia";
 import { ThemeModeComponent } from "@/assets/ts/layout";
 
@@ -6,29 +6,59 @@ export const THEME_MODE_LS_KEY = "kt_theme_mode_value";
 export const THEME_MENU_MODE_LS_KEY = "kt_theme_mode_menu";
 
 export const useThemeStore = defineStore("theme", () => {
-  // Always initialize with "light" regardless of localStorage
-  const mode = ref<"light" | "dark" | "system">("light");
+  // Initialize with system preference or fallback to light
+  const mode = ref<"light" | "dark" | "system">("system");
   
-  function setThemeMode(payload: "light" | "dark" | "system") {
-    // Always set to light regardless of the payload
-    const currentMode = "light";
+  // Function to detect system preference
+  function getSystemTheme(): "light" | "dark" {
+    return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  }
+  
+  // Apply theme to document and localStorage
+  function applyTheme(themeValue: "light" | "dark") {
+    document.documentElement.setAttribute("data-bs-theme", themeValue);
+    localStorage.setItem(THEME_MODE_LS_KEY, themeValue);
+    localStorage.setItem(THEME_MENU_MODE_LS_KEY, themeValue);
     
-    // Still update localStorage to maintain compatibility
-    localStorage.setItem(THEME_MODE_LS_KEY, currentMode);
-    localStorage.setItem(THEME_MENU_MODE_LS_KEY, currentMode);
-    
-    // Keep the mode value as light
-    mode.value = "light";
-    
-    // Set the document theme to light
-    document.documentElement.setAttribute("data-bs-theme", "light");
-    
-    // Still call init to maintain compatibility with other code
+    // Call ThemeModeComponent.init() to maintain compatibility
     ThemeModeComponent.init();
   }
-
-  // Initialize theme to light on store creation
-  document.documentElement.setAttribute("data-bs-theme", "light");
+  
+  function setThemeMode(payload: "light" | "dark" | "system") {
+    mode.value = payload;
+    
+    if (payload === "system") {
+      // Apply system preference
+      applyTheme(getSystemTheme());
+    } else {
+      // Apply explicit light/dark choice
+      applyTheme(payload);
+    }
+  }
+  
+  // Watch for system preference changes when in "system" mode
+  onMounted(() => {
+    // Initialize theme based on saved preference or system default
+    const savedMode = localStorage.getItem(THEME_MODE_LS_KEY) as "light" | "dark" | "system" | null;
+    setThemeMode(savedMode || "system");
+    
+    // Add listener for system theme changes
+    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+    mediaQuery.addEventListener("change", () => {
+      if (mode.value === "system") {
+        applyTheme(getSystemTheme());
+      }
+    });
+  });
+  
+  // Watch for mode changes
+  watch(mode, (newMode) => {
+    if (newMode === "system") {
+      applyTheme(getSystemTheme());
+    } else {
+      applyTheme(newMode);
+    }
+  });
   
   return {
     mode,
